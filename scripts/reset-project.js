@@ -6,8 +6,10 @@
  * You can remove the `reset-project` script from package.json and safely delete this file after running it.
  */
 
-const fs = require("fs");
-const path = require("path");
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const readline = require("readline");
 
 const root = process.cwd();
@@ -44,6 +46,57 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
+
+// Function to execute commands safely
+function executeCommand(command) {
+  try {
+    console.log(`\n📝 Executing: ${command}`);
+    execSync(command, { stdio: 'inherit' });
+  } catch (error) {
+    console.error(`❌ Error executing command: ${command}`);
+    console.error(error.message);
+  }
+}
+
+// Clear Metro bundler cache
+console.log('\n🧹 Clearing Metro bundler cache...');
+executeCommand('rm -rf $TMPDIR/metro-*');
+
+// Clear Expo cache (using user's home directory)
+console.log('\n🧹 Clearing Expo cache...');
+const homeDir = os.homedir();
+const expoCachePath = path.join(homeDir, '.expo');
+if (fs.existsSync(expoCachePath)) {
+  try {
+    fs.rmSync(expoCachePath, { recursive: true, force: true });
+    console.log('✅ Expo cache cleared successfully');
+  } catch (error) {
+    console.error('❌ Could not clear Expo cache:', error.message);
+    console.log('⚠️ You may need to manually delete the ~/.expo directory');
+  }
+}
+
+// Remove node_modules and reinstall
+console.log('\n🗑️ Removing node_modules...');
+executeCommand('rm -rf node_modules');
+console.log('\n📦 Reinstalling dependencies...');
+executeCommand('npm install');
+
+// Clear watchman cache
+console.log('\n🧹 Clearing Watchman cache...');
+executeCommand('watchman watch-del-all');
+
+// Create a fresh .watchmanconfig if it doesn't exist
+const watchmanConfigPath = path.join(process.cwd(), '.watchmanconfig');
+if (!fs.existsSync(watchmanConfigPath)) {
+  console.log('\n📝 Creating fresh .watchmanconfig...');
+  fs.writeFileSync(watchmanConfigPath, '{}');
+}
+
+console.log('\n✨ Project reset complete!');
+console.log('\nNext steps:');
+console.log('1. Run "npx expo start" to start your project');
+console.log('2. If you encounter any issues, try running "npm run reset-project" again');
 
 const moveDirectories = async (userInput) => {
   try {
@@ -87,7 +140,7 @@ const moveDirectories = async (userInput) => {
 
     console.log("\n✅ Project reset complete. Next steps:");
     console.log(
-      `1. Run \`npx expo start\` to start a development server.\n2. Edit app/index.tsx to edit the main screen.${
+      `1. Run \`npx expo start\` to start a development server.${
         userInput === "y"
           ? `\n3. Delete the /${exampleDir} directory when you're done referencing it.`
           : ""
